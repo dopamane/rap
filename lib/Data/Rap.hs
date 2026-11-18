@@ -61,7 +61,14 @@ putRap r = case r of
   Verse cid bs -> putVerse cid bs
 
 putStanza :: Riff -> (Put, Word32)
-putStanza = undefined
+putStanza = go 0
+  where
+    go cnt [] = (mempty, cnt)
+    go cnt (r:rs) = case r of
+      Verse cid bs ->
+        let (p, cnt') = go (8 + verseSz bs + cnt) rs
+        in (putVerse cid bs <> p, cnt')
+      Stanza cid cty rs' -> undefined
 
 putVerse :: String -> ByteString -> Put
 putVerse cid bs = do

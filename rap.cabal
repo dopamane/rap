@@ -47,5 +47,8 @@ test-suite test
   main-is:          Main.hs
   build-depends:
     base < 5,
+    binary,
+    bytestring,
     rap,
-    tasty
+    tasty,
+    tasty-hunit
