@@ -25,6 +25,7 @@ library
   exposed-modules:  Data.Rap
   build-depends:
     base < 5,
+    binary,
     bytestring
 
 executable rap
