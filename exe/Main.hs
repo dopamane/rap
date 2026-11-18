@@ -1,8 +1,6 @@
 module Main (main) where
 
-import qualified MyLib (someFunc)
+import Data.Rap
 
 main :: IO ()
-main = do
-  putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+main = putStrLn $ "Hello, Haskell!" ++ " " ++ show Stanza
