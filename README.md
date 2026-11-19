@@ -1,5 +1,6 @@
 # rap
-Resource Interchange File Format (RIFF)
+
+[Resource Interchange File Format (RIFF)](https://www.loc.gov/preservation/digital/formats/fdd/fdd000025.shtml)
 
 Development
 
