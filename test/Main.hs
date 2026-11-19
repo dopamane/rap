@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main (main) where
 
 import Data.Binary.Get
@@ -13,6 +15,7 @@ main :: IO ()
 main = defaultMain $ testGroup "Data.Rap"
   [ getEmptyTest, getVerseTest, getVersesTest
   , putEmptyTest, putVerseTest
+  , tillICollapseTest
   ]
 
 getEmptyTest :: TestTree
@@ -48,3 +51,28 @@ krs1BS = mconcat [BSC.pack "krs1" <>
 
 stepIntoAWorld :: String
 stepIntoAWorld = "step into a world where theres no one left but the very best"
+
+tillICollapse :: Rap
+tillICollapse =
+  [ Stanza "RIFF" "mnem"
+  [ Verse "lin1" "Til I collapse, I'm spillin' these raps long as you feel em"
+  , Verse "lin2" "Til the day that I drop, you'll never say that I'm not killin em"
+  , Verse "lin3" "Cause when I am not, then Ima stop pennin em"
+  , Verse "lin4" "And I am not hip-hop and Im just not Eminem"
+  , Verse "lin5" "Subliminal throughts, when Ima stop sendin em?"
+  , Verse "lin6" "Women are caught in webs, spin em and hock venom"
+  , Verse "lin7" "Adrenaline shots of penicillin could not get the illin to stop"
+  , Verse "lin8" "Amoxicillins just not real enough"
+  , Verse "lin9" "The criminal, cop-killin, hip-hop villain"
+  , Verse "li10" "A minimal swap to cop millions of Pac listeners"
+  , Verse "li11" "Youre comin with me, feel it or not"
+  , Verse "li12" "You're gonna fear it like I showed ya the spirit of God lives in us"
+  , Verse "li13" "You hear it a lot, lyrics to shock"
+  , Verse "li14" "Is it a miracle or am I just product of pop fizzin' up?"
+  , Verse "li15" "Fa' shizzle, my wizzle, this is the plot, listen up"
+  , Verse "li16" "You bizzles forgot, Slizzle does not give a fuck"
+  ]]
+
+tillICollapseTest :: TestTree
+tillICollapseTest = testCase "TillICollapse" $
+  runGet getRap (runPut $ putRap tillICollapse) @?= tillICollapse
