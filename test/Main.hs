@@ -14,7 +14,7 @@ import Test.Tasty.HUnit
 main :: IO ()
 main = defaultMain $ testGroup "Data.Rap"
   [ getEmptyTest, getVerseTest, getVersesTest
-  , putEmptyTest, putVerseTest
+  , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest
   ]
 
@@ -34,11 +34,19 @@ putEmptyTest = testCase "Put empty" $ runPut (putRap []) @?= mempty
 putVerseTest :: TestTree
 putVerseTest = testCase "Put verse" $ runPut (putRap l33tVerse) @?= l33tVerseBS
 
+putStanzaTest :: TestTree
+putStanzaTest = testCase "Put stanza" $ BS.unpack (runPut (putRap r)) @?= BS.unpack b
+  where
+    r = [Stanza "RIFF" "riff" $ l33tVerse ++ krs1Verse]
+    b = mconcat ["RIFF"
+      , runPut (putWord32le $ fromIntegral $ 4 + BS.length l33tVerseBS + BS.length krs1BS)
+      , "riff" <> l33tVerseBS <> krs1BS]
+
 l33tVerse :: Rap
-l33tVerse = [Verse "1337" $ BSC.pack "hello world"]
+l33tVerse = [Verse "1337" "hello world"]
 
 l33tVerseBS :: ByteString
-l33tVerseBS = mconcat [BSC.pack "1337" <> runPut (putWord32le 11)
+l33tVerseBS = mconcat ["1337" <> runPut (putWord32le 11)
   , BSC.pack "hello world" <> BS.singleton 0x00]
 
 krs1Verse :: Rap
