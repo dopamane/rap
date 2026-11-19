@@ -18,7 +18,7 @@ getRiff = many getRap
 putRiff :: Riff -> Put
 putRiff = foldMap putRap
 
-data Rap = Stanza String String Riff | Verse String ByteString
+data Rap = Verse String ByteString | Stanza String String Riff
   deriving (Eq, Read, Show)
 
 getRap :: Get Rap
@@ -52,23 +52,27 @@ getPad csz = when (odd csz) (void getWord8)
 
 putRap :: Rap -> Put
 putRap r = case r of
+  Verse cid bs -> putVerse cid bs
   Stanza cid cty rs -> do
     putLazyByteString $ BSC.pack cid
-    let (stz, csz) = putStanza rs
-    putWord32le csz
+    let (elems, csz) = putElems rs
+    putWord32le $ csz + 4
     putLazyByteString $ BSC.pack cty
-    stz
-  Verse cid bs -> putVerse cid bs
+    elems
 
-putStanza :: Riff -> (Put, Word32)
-putStanza = go 0
-  where
-    go cnt [] = (mempty, cnt)
-    go cnt (r:rs) = case r of
-      Verse cid bs ->
-        let (p, cnt') = go (8 + verseSz bs + cnt) rs
-        in (putVerse cid bs <> p, cnt')
-      Stanza cid cty rs' -> undefined
+putElems :: Riff -> (Put, Word32)
+putElems = accumElems . map putElem
+
+accumElems :: [(Put, Word32)] -> (Put, Word32)
+accumElems es = let (ps, cs) = unzip es
+                in (mconcat ps, sum cs)
+
+putElem :: Rap -> (Put, Word32)
+putElem r = case r of
+  Verse cid bs -> (putVerse cid bs, 8 + verseSz bs)
+  Stanza cid cty rs' ->
+    let (sub, scnt) = putElems rs'
+    in (undefined, undefined)
 
 putVerse :: String -> ByteString -> Put
 putVerse cid bs = do
