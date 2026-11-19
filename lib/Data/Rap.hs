@@ -24,11 +24,9 @@ data Riff = Verse String ByteString | Stanza String String Rap
 getRiff :: Get Riff
 getRiff = do
   (cid, csz) <- getHeader
-  r <- if cid == "RIFF" || cid == "LIST"
+  if cid == "RIFF" || cid == "LIST"
     then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
-    else Verse  cid <$> getLazyByteString (fromIntegral csz)
-  getPad csz
-  return r
+    else Verse cid <$> getLazyByteString (fromIntegral csz) <* getPad csz
 
 getElems :: Word32 -> Get Rap
 getElems ssz = go 0
@@ -40,8 +38,7 @@ getElems ssz = go 0
         (cid, csz) <- getHeader
         e <- if cid == "RIFF" || cid == "LIST"
           then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
-          else Verse  cid <$> getLazyByteString (fromIntegral csz)
-        getPad csz
+          else Verse cid <$> getLazyByteString (fromIntegral csz) <* getPad csz
         fmap (e:) $ go $ applyWhen (odd csz) (+ 1) $ cnt + 8 + csz
 
 getHeader :: Get (String, Word32)
@@ -69,7 +66,8 @@ accumElems es = let (ps, cs) = unzip es
 
 putElem :: Riff -> (Put, Word32)
 putElem r = case r of
-  Verse cid bs -> (putVerse cid bs, 8 + verseSz bs)
+  Verse cid bs -> let cnt = fromIntegral $ BS.length bs
+                  in (putVerse cid bs, 8 + applyWhen (odd cnt) (+ 1) cnt)
   Stanza cid cty rs ->
     let (es, cnt) = putElems rs
         p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ 4 + cnt
@@ -79,12 +77,7 @@ putElem r = case r of
 putVerse :: String -> ByteString -> Put
 putVerse cid bs = do
   putLazyByteString $ BSC.pack cid
-  let csz = verseSz bs
+  let csz = fromIntegral $ BS.length bs
   putWord32le csz
   putLazyByteString bs
   when (odd csz) $ putWord8 0x00
-
-verseSz :: ByteString -> Word32
-verseSz bs = fromIntegral $ applyWhen (odd csz) (+ 1) csz
-  where
-    csz = BS.length bs
