@@ -70,9 +70,11 @@ accumElems es = let (ps, cs) = unzip es
 putElem :: Riff -> (Put, Word32)
 putElem r = case r of
   Verse cid bs -> (putVerse cid bs, 8 + verseSz bs)
-  Stanza cid cty rs' ->
-    let (sub, scnt) = putElems rs'
-    in (undefined, undefined)
+  Stanza cid cty rs ->
+    let (es, cnt) = putElems rs
+        p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ 4 + cnt
+          , putLazyByteString $ BSC.pack cty, es]
+    in (p, 8 + 4 + cnt)
 
 putVerse :: String -> ByteString -> Put
 putVerse cid bs = do
