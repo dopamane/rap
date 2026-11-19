@@ -5,5 +5,6 @@ Development
 
 ```
 cabal build
+cabal haddock
 cabal run test
 ```

@@ -8,14 +8,16 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSC
 import Data.Rap
+import Paths_rap
+import System.FilePath
 import Test.Tasty
 import Test.Tasty.HUnit
 
 main :: IO ()
-main = defaultMain $ testGroup "Data.Rap"
+main = getDataDir >>= \dataDir -> defaultMain $ testGroup "Data.Rap"
   [ getEmptyTest, getVerseTest, getStanzaTest
   , putEmptyTest, putVerseTest, putStanzaTest
-  , tillICollapseTest
+  , tillICollapseTest, wavTest dataDir
   ]
 
 getEmptyTest :: TestTree
@@ -88,3 +90,8 @@ tillICollapse =
 tillICollapseTest :: TestTree
 tillICollapseTest = testCase "TillICollapse" $
   runGet getRap (runPut $ putRap tillICollapse) @?= tillICollapse
+
+wavTest :: FilePath -> TestTree
+wavTest dataDir = testCase "wav" $ do
+  bs <- BS.readFile $ dataDir </> "hello.wav"
+  runPut (putRap $ runGet getRap bs) @?= bs

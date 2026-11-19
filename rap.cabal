@@ -13,6 +13,8 @@ category:           Data
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
                     README.md
+data-dir:           data
+data-files:         hello.wav
 
 source-repository head
   type: git
@@ -45,10 +47,13 @@ test-suite test
   hs-source-dirs:   test
   type:             exitcode-stdio-1.0
   main-is:          Main.hs
+  other-modules:    Paths_rap
+  autogen-modules:  Paths_rap
   build-depends:
     base < 5,
     binary,
     bytestring,
+    filepath,
     rap,
     tasty,
     tasty-hunit
