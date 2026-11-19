@@ -13,7 +13,7 @@ import Test.Tasty.HUnit
 
 main :: IO ()
 main = defaultMain $ testGroup "Data.Rap"
-  [ getEmptyTest, getVerseTest, getVersesTest
+  [ getEmptyTest, getVerseTest, getStanzaTest
   , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest
   ]
@@ -24,9 +24,9 @@ getEmptyTest = testCase "Get empty" $ runGet getRap mempty @?= []
 getVerseTest :: TestTree
 getVerseTest = testCase "Get verse" $ runGet getRap l33tVerseBS @?= l33tVerse
 
-getVersesTest :: TestTree
-getVersesTest = testCase "Get verses" $ runGet getRap (l33tVerseBS <> krs1BS)
-  @?= l33tVerse ++ krs1Verse
+getStanzaTest :: TestTree
+getStanzaTest = testCase "Get stanza" $
+  runGet getRap sampStanzaBS @?= sampStanza
 
 putEmptyTest :: TestTree
 putEmptyTest = testCase "Put empty" $ runPut (putRap []) @?= mempty
@@ -35,12 +35,16 @@ putVerseTest :: TestTree
 putVerseTest = testCase "Put verse" $ runPut (putRap l33tVerse) @?= l33tVerseBS
 
 putStanzaTest :: TestTree
-putStanzaTest = testCase "Put stanza" $ BS.unpack (runPut (putRap r)) @?= BS.unpack b
-  where
-    r = [Stanza "RIFF" "riff" $ l33tVerse ++ krs1Verse]
-    b = mconcat ["RIFF"
-      , runPut (putWord32le $ fromIntegral $ 4 + BS.length l33tVerseBS + BS.length krs1BS)
-      , "riff" <> l33tVerseBS <> krs1BS]
+putStanzaTest = testCase "Put stanza" $
+  BS.unpack (runPut (putRap sampStanza)) @?= BS.unpack sampStanzaBS
+
+sampStanza :: Rap
+sampStanza = [Stanza "RIFF" "riff" $ l33tVerse ++ krs1Verse]
+
+sampStanzaBS :: ByteString
+sampStanzaBS = mconcat ["RIFF"
+  , runPut (putWord32le $ fromIntegral $ 4 + BS.length l33tVerseBS + BS.length krs1BS)
+  , "riff" <> l33tVerseBS <> krs1BS]
 
 l33tVerse :: Rap
 l33tVerse = [Verse "1337" "hello world"]
