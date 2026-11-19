@@ -1,4 +1,4 @@
-module Data.Rap (Riff, getRiff, putRiff, Rap(..)) where
+module Data.Rap (Rap, getRap, putRap, Riff(..)) where
 
 import Control.Applicative
 import Control.Monad
@@ -10,39 +10,39 @@ import qualified Data.ByteString.Lazy.Char8 as BSC
 import Data.Function
 import Data.Word
 
-type Riff = [Rap]
-
-getRiff :: Get Riff
-getRiff = many getRap
-
-putRiff :: Riff -> Put
-putRiff = foldMap putRap
-
-data Rap = Verse String ByteString | Stanza String String Riff
-  deriving (Eq, Read, Show)
+type Rap = [Riff]
 
 getRap :: Get Rap
-getRap = do
+getRap = many getRiff
+
+putRap :: Rap -> Put
+putRap = foldMap putRiff
+
+data Riff = Verse String ByteString | Stanza String String Rap
+  deriving (Eq, Read, Show)
+
+getRiff :: Get Riff
+getRiff = do
   (cid, csz) <- getHeader
-  rap <- if cid == "RIFF" || cid == "LIST"
-    then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getStanza (csz - 4)
+  r <- if cid == "RIFF" || cid == "LIST"
+    then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
     else Verse  cid <$> getLazyByteString (fromIntegral csz)
   getPad csz
-  return rap
+  return r
 
-getStanza :: Word32 -> Get [Rap]
-getStanza ssz = go 0
+getElems :: Word32 -> Get Rap
+getElems ssz = go 0
   where
     go cnt
       | cnt == ssz = return []
-      | cnt >  ssz = fail "getStanza: overflow"
+      | cnt >  ssz = fail "getElems: overflow"
       | otherwise  = do
         (cid, csz) <- getHeader
-        rap <- if cid == "RIFF" || cid == "LIST"
-          then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getStanza (csz - 4)
+        e <- if cid == "RIFF" || cid == "LIST"
+          then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
           else Verse  cid <$> getLazyByteString (fromIntegral csz)
         getPad csz
-        fmap (rap:) $ go $ applyWhen (odd csz) (+ 1) $ cnt + 8 + csz
+        fmap (e:) $ go $ applyWhen (odd csz) (+ 1) $ cnt + 8 + csz
 
 getHeader :: Get (String, Word32)
 getHeader = (,) <$> fmap BSC.unpack (getLazyByteString 4) <*> getWord32le
@@ -50,24 +50,24 @@ getHeader = (,) <$> fmap BSC.unpack (getLazyByteString 4) <*> getWord32le
 getPad :: Word32 -> Get ()
 getPad csz = when (odd csz) (void getWord8)
 
-putRap :: Rap -> Put
-putRap r = case r of
+putRiff :: Riff -> Put
+putRiff r = case r of
   Verse cid bs -> putVerse cid bs
   Stanza cid cty rs -> do
     putLazyByteString $ BSC.pack cid
-    let (elems, csz) = putElems rs
-    putWord32le $ csz + 4
+    let (es, esz) = putElems rs
+    putWord32le $ esz + 4
     putLazyByteString $ BSC.pack cty
-    elems
+    es
 
-putElems :: Riff -> (Put, Word32)
+putElems :: Rap -> (Put, Word32)
 putElems = accumElems . map putElem
 
 accumElems :: [(Put, Word32)] -> (Put, Word32)
 accumElems es = let (ps, cs) = unzip es
                 in (mconcat ps, sum cs)
 
-putElem :: Rap -> (Put, Word32)
+putElem :: Riff -> (Put, Word32)
 putElem r = case r of
   Verse cid bs -> (putVerse cid bs, 8 + verseSz bs)
   Stanza cid cty rs' ->
