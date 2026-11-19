@@ -22,11 +22,7 @@ data Riff = Verse String ByteString | Stanza String String Rap
   deriving (Eq, Read, Show)
 
 getRiff :: Get Riff
-getRiff = do
-  (cid, csz) <- getHeader
-  if cid == "RIFF" || cid == "LIST"
-    then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
-    else Verse cid <$> getLazyByteString (fromIntegral csz) <* getPad csz
+getRiff = uncurry getElem =<< getHeader
 
 getElems :: Word32 -> Get Rap
 getElems ssz = go 0
@@ -36,10 +32,13 @@ getElems ssz = go 0
       | cnt >  ssz = fail "getElems: overflow"
       | otherwise  = do
         (cid, csz) <- getHeader
-        e <- if cid == "RIFF" || cid == "LIST"
-          then Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
-          else Verse cid <$> getLazyByteString (fromIntegral csz) <* getPad csz
-        fmap (e:) $ go $ applyWhen (odd csz) (+ 1) $ cnt + 8 + csz
+        (:) <$> getElem cid csz <*> go (applyWhen (odd csz) (+ 1) $ cnt + 8 + csz)
+
+getElem :: String -> Word32 -> Get Riff
+getElem cid csz
+  | cid == "RIFF" || cid == "LIST" =
+    Stanza cid <$> fmap BSC.unpack (getLazyByteString 4) <*> getElems (csz - 4)
+  | otherwise = Verse cid <$> getLazyByteString (fromIntegral csz) <* getPad csz
 
 getHeader :: Get (String, Word32)
 getHeader = (,) <$> fmap BSC.unpack (getLazyByteString 4) <*> getWord32le
