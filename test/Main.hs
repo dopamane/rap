@@ -22,6 +22,7 @@ main = getDataDir >>= \dataDir -> defaultMain $ testGroup "Data.Rap"
   , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest, wavTest dataDir
   , putVerseTooLongTest, putStanzaTooLongTest
+  , badVerseID, badStanzaForm
   ]
 
 getEmptyTest :: TestTree
@@ -111,3 +112,16 @@ putStanzaTooLongTest = testCase "stanzaTooLong" $ do
             [Verse "baar" $ BS.replicate (fromIntegral (maxBound :: Word32)) 0xFF]]
       len = 4 + 8 + fromIntegral (maxBound :: Word32) + 1 :: Integer -- odd len
   (void . putRap) stz @?= Left ("LIST: fooo: length too long: " ++ show len)
+
+badVerseID :: TestTree
+badVerseID = testCase "badVerseID" $
+  (void . putRap) [Verse "foo" mempty] @?= Left ("expecting 4 byte ID: \"foo\"")
+
+badStanzaForm :: TestTree
+badStanzaForm = testCase "badStanzaForm" $ do
+  (void . putRap) [Stanza "foo" "baar" []] @?= Left "expecting 4 byte ID: \"foo\""
+  (void . putRap) [Stanza "fooo" "bar" []] @?= Left "expecting 4 byte type: \"bar\""
+  (void . putRap) [Stanza "fooo" "baar" [Stanza "zoo" "cafe" []]]
+    @?= Left "expecting 4 byte ID: \"zoo\""
+  (void . putRap) [Stanza "fooo" "baar" [Stanza "zooo" "caf" []]]
+    @?= Left "expecting 4 byte type: \"caf\""
