@@ -54,6 +54,8 @@ putRiff r = case r of
     Right (es, esz)
       | esz + 4 > fromIntegral (maxBound :: Word32) ->
         Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (esz + 4)
+      | length cid /= 4 -> Left $ "expecting 4 byte ID: " ++ show cid
+      | length cty /= 4 -> Left $ "expecting 4 byte type: " ++ show cty
       | otherwise -> Right $ do
         putLazyByteString $ BSC.pack cid
         putWord32le $ fromIntegral $ esz + 4
@@ -80,6 +82,8 @@ putElem r = case r of
     Right (es, cnt)
       | 4 + cnt > fromIntegral (maxBound :: Word32) ->
         Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (4 + cnt)
+      | length cid /= 4 -> Left $ "expecting 4 byte ID: " ++ show cid
+      | length cty /= 4 -> Left $ "expecting 4 byte type: " ++ show cty
       | otherwise ->
         let p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ fromIntegral (4 + cnt)
                 , putLazyByteString $ BSC.pack cty, es]
@@ -88,6 +92,7 @@ putElem r = case r of
 putVerse :: String -> ByteString -> Either String Put
 putVerse cid bs
   | l > fromIntegral (maxBound :: Word32) = Left $ cid ++ " bytes too long: " ++ show l
+  | length cid /= 4 = Left $ "expecting 4 byte ID: " ++ show cid
   | otherwise = Right $ do
     putLazyByteString $ BSC.pack cid
     let csz = fromIntegral l
