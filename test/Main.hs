@@ -8,7 +8,6 @@ import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSC
-import Data.Int
 import Data.Rap
 import Data.Word
 import Paths_rap
@@ -21,7 +20,7 @@ main = getDataDir >>= \dataDir -> defaultMain $ testGroup "Data.Rap"
   [ getEmptyTest, getVerseTest, getStanzaTest
   , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest, wavTest dataDir
-  , putVerseTooLongTest, putStanzaTooLongTest
+  , putVerseTooLongTest, infiniteVerseTest, putStanzaTooLongTest, infStanzaTest
   , badVerseID, badStanzaForm
   ]
 
@@ -104,14 +103,23 @@ wavTest dataDir = testCase "wav" $ do
 putVerseTooLongTest :: TestTree
 putVerseTooLongTest = testCase "verseTooLong" $
   (void . putRap) [Verse "fooo" $ BS.replicate (fromIntegral (maxBound :: Word32) + 1) 0xFF]
-    @?= Left ("fooo bytes too long: " ++ show (fromIntegral (maxBound :: Word32) + (1 :: Int64)))
+    @?= Left ("fooo byte length > " ++ show (maxBound :: Word32))
+
+infiniteVerseTest :: TestTree
+infiniteVerseTest = testCase "infiniteVerse" $
+  (void . putRap) [Verse "fooo" $ BS.repeat 0xFF]
+    @?= Left ("fooo byte length > " ++ show (maxBound :: Word32))
 
 putStanzaTooLongTest :: TestTree
 putStanzaTooLongTest = testCase "stanzaTooLong" $ do
   let stz = [Stanza "LIST" "fooo"
             [Verse "baar" $ BS.replicate (fromIntegral (maxBound :: Word32)) 0xFF]]
-      len = 4 + 8 + fromIntegral (maxBound :: Word32) + 1 :: Integer -- odd len
-  (void . putRap) stz @?= Left ("LIST: fooo: length too long: " ++ show len)
+  (void . putRap) stz @?= Left ("LIST: fooo: length > " ++ show (maxBound :: Word32))
+
+infStanzaTest :: TestTree
+infStanzaTest = testCase "infStanza" $ do
+  let stz = [Stanza "LIST" "fooo" $ repeat $ Verse "baar" $ BS.replicate 4096 0xFF]
+  (void . putRap) stz @?= Left ("LIST: fooo: length > " ++ show (maxBound :: Word32))
 
 badVerseID :: TestTree
 badVerseID = testCase "badVerseID" $ do

@@ -49,10 +49,10 @@ getPad csz = when (odd csz) (void getWord8)
 
 putRiff :: Riff -> Either String Put
 putRiff r = case r of
-  Verse cid bs -> putVerse cid bs
-  Stanza cid cty rs -> case putElems rs of
+  Verse cid bs -> fst <$> putVerse cid bs
+  Stanza cid cty rs -> case putElems cid cty rs of
     Left err -> Left err
-    Right (es, esz)
+    Right (esz, es)
       | esz + 4 > fromIntegral (maxBound :: Word32) ->
         Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (esz + 4)
       | otherwise -> check4Byte "ID" cid >> check4Byte "type" cty $> do
@@ -61,42 +61,47 @@ putRiff r = case r of
         putLazyByteString $ BSC.pack cty
         es
 
-putElems :: Rap -> Either String (Put, Integer)
-putElems = accumElems . map putElem
-
-accumElems :: [Either String (Put, Integer)] -> Either String (Put, Integer)
-accumElems ees = do
-  es <- sequence ees
-  let (ps, cs) = unzip es
-  return (mconcat ps, sum cs)
+putElems :: String -> String -> Rap -> Either String (Integer, Put)
+putElems cid cty = go 0
+  where
+    go n [] = Right (n, mempty)
+    go n (r:rs) = case putElem r of
+      Left err -> Left err
+      Right (p, n')
+        | n + n' > fromIntegral (maxBound :: Word32) ->
+          Left $ cid ++ ": " ++ cty ++ ": length > " ++ show (maxBound :: Word32)
+        | otherwise -> (fmap . fmap) (p <>) $ go (n + n') rs
 
 putElem :: Riff -> Either String (Put, Integer)
 putElem r = case r of
   Verse cid bs -> do
-    let cnt = fromIntegral $ BS.length bs
-    v <- putVerse cid bs
+    (v, cnt) <- putVerse cid bs
     return (v, 8 + applyWhen (odd cnt) (+ 1) cnt)
-  Stanza cid cty rs -> case putElems rs of
+  Stanza cid cty rs -> case putElems cid cty rs of
     Left err -> Left err
-    Right (es, cnt)
+    Right (cnt, es)
       | 4 + cnt > fromIntegral (maxBound :: Word32) ->
-        Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (4 + cnt)
+        Left $ cid ++ ": " ++ cty ++ ": length too long: " ++
+          show (4 + cnt) ++ " > " ++ show (maxBound :: Word32)
       | otherwise -> check4Byte "ID" cid >> check4Byte "type" cty $>
         let p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ fromIntegral (4 + cnt)
                 , putLazyByteString $ BSC.pack cty, es]
         in (p, 8 + 4 + cnt)
 
-putVerse :: String -> ByteString -> Either String Put
+putVerse :: String -> ByteString -> Either String (Put, Integer)
 putVerse cid bs
-  | l > fromIntegral (maxBound :: Word32) = Left $ cid ++ " bytes too long: " ++ show l
-  | otherwise = check4Byte "ID" cid $> do
-    putLazyByteString $ BSC.pack cid
-    let csz = fromIntegral l
-    putWord32le csz
-    putLazyByteString bs
-    when (odd csz) $ putWord8 0x00
+  | not (BS.null rest) = Left $ cid ++ " byte length > " ++ show (maxBound :: Word32)
+  | otherwise = do
+    check4Byte "ID" cid
+    return $ flip (,) (fromIntegral l) $ do
+      putLazyByteString $ BSC.pack cid
+      let csz = fromIntegral l
+      putWord32le csz
+      putLazyByteString bs'
+      when (odd csz) $ putWord8 0x00
   where
-    l = BS.length bs
+    (bs', rest) = BS.splitAt (fromIntegral (maxBound :: Word32)) bs
+    l = BS.length bs'
 
 check4Byte :: String -> String -> Either String ()
 check4Byte _ [_,_,_,_] = Right ()
