@@ -21,7 +21,7 @@ main = getDataDir >>= \dataDir -> defaultMain $ testGroup "Data.Rap"
   [ getEmptyTest, getVerseTest, getStanzaTest
   , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest, wavTest dataDir
-  , putVerseTooLongTest
+  , putVerseTooLongTest, putStanzaTooLongTest
   ]
 
 getEmptyTest :: TestTree
@@ -104,3 +104,10 @@ putVerseTooLongTest :: TestTree
 putVerseTooLongTest = testCase "verseTooLong" $
   (void . putRap) [Verse "fooo" $ BS.replicate (fromIntegral (maxBound :: Word32) + 1) 0xFF]
     @?= Left ("fooo bytes too long: " ++ show (fromIntegral (maxBound :: Word32) + (1 :: Int64)))
+
+putStanzaTooLongTest :: TestTree
+putStanzaTooLongTest = testCase "stanzaTooLong" $ do
+  let stz = [Stanza "LIST" "fooo"
+            [Verse "baar" $ BS.replicate (fromIntegral (maxBound :: Word32)) 0xFF]]
+      len = 4 + 8 + fromIntegral (maxBound :: Word32) + 1 :: Integer -- odd len
+  (void . putRap) stz @?= Left ("LIST: fooo: length too long: " ++ show len)
