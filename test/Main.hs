@@ -31,14 +31,14 @@ getStanzaTest = testCase "Get stanza" $
   runGet getRap sampStanzaBS @?= sampStanza
 
 putEmptyTest :: TestTree
-putEmptyTest = testCase "Put empty" $ runPut (putRap []) @?= mempty
+putEmptyTest = testCase "Put empty" $ fmap runPut (putRap []) @?= Right mempty
 
 putVerseTest :: TestTree
-putVerseTest = testCase "Put verse" $ runPut (putRap l33tVerse) @?= l33tVerseBS
+putVerseTest = testCase "Put verse" $ fmap runPut (putRap l33tVerse) @?= Right l33tVerseBS
 
 putStanzaTest :: TestTree
 putStanzaTest = testCase "Put stanza" $
-  BS.unpack (runPut (putRap sampStanza)) @?= BS.unpack sampStanzaBS
+  fmap (BS.unpack . runPut) (putRap sampStanza) @?= Right (BS.unpack sampStanzaBS)
 
 sampStanza :: Rap
 sampStanza = [Stanza "RIFF" "riff" $ l33tVerse ++ krs1Verse]
@@ -89,9 +89,9 @@ tillICollapse =
 
 tillICollapseTest :: TestTree
 tillICollapseTest = testCase "TillICollapse" $
-  runGet getRap (runPut $ putRap tillICollapse) @?= tillICollapse
+  fmap (runGet getRap . runPut) (putRap tillICollapse) @?= Right tillICollapse
 
 wavTest :: FilePath -> TestTree
 wavTest dataDir = testCase "wav" $ do
   bs <- BS.readFile $ dataDir </> "hello.wav"
-  runPut (putRap $ runGet getRap bs) @?= bs
+  fmap runPut (putRap $ runGet getRap bs) @?= Right bs
