@@ -8,6 +8,7 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSC
 import Data.Function
+import Data.Functor hiding (unzip)
 import Data.Word
 
 type Rap = [Riff]
@@ -54,9 +55,7 @@ putRiff r = case r of
     Right (es, esz)
       | esz + 4 > fromIntegral (maxBound :: Word32) ->
         Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (esz + 4)
-      | length cid /= 4 -> Left $ "expecting 4 byte ID: " ++ show cid
-      | length cty /= 4 -> Left $ "expecting 4 byte type: " ++ show cty
-      | otherwise -> Right $ do
+      | otherwise -> check4Byte "ID" cid >> check4Byte "type" cty $> do
         putLazyByteString $ BSC.pack cid
         putWord32le $ fromIntegral $ esz + 4
         putLazyByteString $ BSC.pack cty
@@ -82,18 +81,15 @@ putElem r = case r of
     Right (es, cnt)
       | 4 + cnt > fromIntegral (maxBound :: Word32) ->
         Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (4 + cnt)
-      | length cid /= 4 -> Left $ "expecting 4 byte ID: " ++ show cid
-      | length cty /= 4 -> Left $ "expecting 4 byte type: " ++ show cty
-      | otherwise ->
+      | otherwise -> check4Byte "ID" cid >> check4Byte "type" cty $>
         let p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ fromIntegral (4 + cnt)
                 , putLazyByteString $ BSC.pack cty, es]
-        in Right (p, 8 + 4 + cnt)
+        in (p, 8 + 4 + cnt)
 
 putVerse :: String -> ByteString -> Either String Put
 putVerse cid bs
   | l > fromIntegral (maxBound :: Word32) = Left $ cid ++ " bytes too long: " ++ show l
-  | length cid /= 4 = Left $ "expecting 4 byte ID: " ++ show cid
-  | otherwise = Right $ do
+  | otherwise = check4Byte "ID" cid $> do
     putLazyByteString $ BSC.pack cid
     let csz = fromIntegral l
     putWord32le csz
@@ -101,3 +97,10 @@ putVerse cid bs
     when (odd csz) $ putWord8 0x00
   where
     l = BS.length bs
+
+check4Byte :: String -> String -> Either String ()
+check4Byte _ [_,_,_,_] = Right ()
+check4Byte lbl s = Left $ "expecting 4 byte " ++ lbl ++ ": " ++ show (x ++ sufx)
+  where
+    (x, y) = splitAt 4 s
+    sufx   = if not (null y) then "..." else ""

@@ -114,14 +114,23 @@ putStanzaTooLongTest = testCase "stanzaTooLong" $ do
   (void . putRap) stz @?= Left ("LIST: fooo: length too long: " ++ show len)
 
 badVerseID :: TestTree
-badVerseID = testCase "badVerseID" $
-  (void . putRap) [Verse "foo" mempty] @?= Left ("expecting 4 byte ID: \"foo\"")
+badVerseID = testCase "badVerseID" $ do
+  (void . putRap) [Verse "foo" mempty] @?= Left "expecting 4 byte ID: \"foo\""
+  (void . putRap) [Verse "foobar" mempty] @?= Left "expecting 4 byte ID: \"foob...\""
 
 badStanzaForm :: TestTree
-badStanzaForm = testCase "badStanzaForm" $ do
+badStanzaForm = testCaseSteps "badStanzaForm" $ \step -> do
+  step "lvl 1"
   (void . putRap) [Stanza "foo" "baar" []] @?= Left "expecting 4 byte ID: \"foo\""
+  (void . putRap) [Stanza "foobar" "baar" []] @?= Left "expecting 4 byte ID: \"foob...\""
   (void . putRap) [Stanza "fooo" "bar" []] @?= Left "expecting 4 byte type: \"bar\""
+  (void . putRap) [Stanza "fooo" "barbaz" []] @?= Left "expecting 4 byte type: \"barb...\""
+  step "lvl 2"
   (void . putRap) [Stanza "fooo" "baar" [Stanza "zoo" "cafe" []]]
     @?= Left "expecting 4 byte ID: \"zoo\""
+  (void . putRap) [Stanza "fooo" "baar" [Stanza "zoozaa" "cafe" []]]
+    @?= Left "expecting 4 byte ID: \"zooz...\""
+  (void . putRap) [Stanza "fooo" "baar" [Stanza "zooo" "cafebeef" []]]
+    @?= Left "expecting 4 byte type: \"cafe...\""
   (void . putRap) [Stanza "fooo" "baar" [Stanza "zooo" "caf" []]]
     @?= Left "expecting 4 byte type: \"caf\""
