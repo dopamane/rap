@@ -2,12 +2,15 @@
 
 module Main (main) where
 
+import Control.Monad
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSC
+import Data.Int
 import Data.Rap
+import Data.Word
 import Paths_rap
 import System.FilePath
 import Test.Tasty
@@ -18,6 +21,7 @@ main = getDataDir >>= \dataDir -> defaultMain $ testGroup "Data.Rap"
   [ getEmptyTest, getVerseTest, getStanzaTest
   , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest, wavTest dataDir
+  , putVerseTooLongTest
   ]
 
 getEmptyTest :: TestTree
@@ -95,3 +99,8 @@ wavTest :: FilePath -> TestTree
 wavTest dataDir = testCase "wav" $ do
   bs <- BS.readFile $ dataDir </> "hello.wav"
   fmap runPut (putRap $ runGet getRap bs) @?= Right bs
+
+putVerseTooLongTest :: TestTree
+putVerseTooLongTest = testCase "verseTooLong" $
+  (void . putRap) [Verse "fooo" $ BS.replicate (fromIntegral (maxBound :: Word32) + 1) 0xFF]
+    @?= Left ("fooo bytes too long: " ++ show (fromIntegral (maxBound :: Word32) + (1 :: Int64)))
