@@ -8,7 +8,6 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BSC
 import Data.Function
-import Data.Functor hiding (unzip)
 import Data.Word
 
 type Rap = [Riff]
@@ -50,43 +49,37 @@ getPad csz = when (odd csz) (void getWord8)
 putRiff :: Riff -> Either String Put
 putRiff r = case r of
   Verse cid bs -> fst <$> putVerse cid bs
-  Stanza cid cty rs -> case putElems cid cty rs of
-    Left err -> Left err
-    Right (esz, es)
-      | esz + 4 > fromIntegral (maxBound :: Word32) ->
-        Left $ cid ++ ": " ++ cty ++ ": length too long: " ++ show (esz + 4)
-      | otherwise -> check4Byte "ID" cid >> check4Byte "type" cty $> do
-        putLazyByteString $ BSC.pack cid
-        putWord32le $ fromIntegral $ esz + 4
-        putLazyByteString $ BSC.pack cty
-        es
+  Stanza cid cty rs -> do
+    check4Byte "ID" cid >> check4Byte "type" cty
+    (esz, es) <- putElems cid cty rs
+    checkLen cid cty (esz + 4)
+    return $ do
+      putLazyByteString $ BSC.pack cid
+      putWord32le $ fromIntegral $ esz + 4
+      putLazyByteString $ BSC.pack cty
+      es
 
 putElems :: String -> String -> Rap -> Either String (Integer, Put)
 putElems cid cty = go 0
   where
-    go n [] = Right (n, mempty)
-    go n (r:rs) = case putElem r of
-      Left err -> Left err
-      Right (p, n')
-        | n + n' > fromIntegral (maxBound :: Word32) ->
-          Left $ cid ++ ": " ++ cty ++ ": length > " ++ show (maxBound :: Word32)
-        | otherwise -> (fmap . fmap) (p <>) $ go (n + n') rs
+    go n [] = return (n, mempty)
+    go n (r:rs) = do
+      (p, n') <- putElem r
+      checkLen cid cty $ n + n'
+      fmap (p <>) <$> go (n + n') rs
 
 putElem :: Riff -> Either String (Put, Integer)
 putElem r = case r of
   Verse cid bs -> do
     (v, cnt) <- putVerse cid bs
     return (v, 8 + applyWhen (odd cnt) (+ 1) cnt)
-  Stanza cid cty rs -> case putElems cid cty rs of
-    Left err -> Left err
-    Right (cnt, es)
-      | 4 + cnt > fromIntegral (maxBound :: Word32) ->
-        Left $ cid ++ ": " ++ cty ++ ": length too long: " ++
-          show (4 + cnt) ++ " > " ++ show (maxBound :: Word32)
-      | otherwise -> check4Byte "ID" cid >> check4Byte "type" cty $>
-        let p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ fromIntegral (4 + cnt)
-                , putLazyByteString $ BSC.pack cty, es]
-        in (p, 8 + 4 + cnt)
+  Stanza cid cty rs -> do
+    check4Byte "ID" cid >> check4Byte "type" cty
+    (cnt, es) <- putElems cid cty rs
+    checkLen cid cty $ 4 + cnt
+    let p = mconcat [putLazyByteString $ BSC.pack cid, putWord32le $ fromIntegral (4 + cnt)
+            , putLazyByteString $ BSC.pack cty, es]
+    return (p, 8 + 4 + cnt)
 
 putVerse :: String -> ByteString -> Either String (Put, Integer)
 putVerse cid bs
@@ -109,3 +102,9 @@ check4Byte lbl s = Left $ "expecting 4 byte " ++ lbl ++ ": " ++ show (x ++ sufx)
   where
     (x, y) = splitAt 4 s
     sufx   = if not (null y) then "..." else ""
+
+checkLen :: String -> String -> Integer -> Either String ()
+checkLen cid cty n
+  | n > fromIntegral (maxBound :: Word32) =
+    Left $ cid ++ ": " ++ cty ++ ": length > " ++ show (maxBound :: Word32)
+  | otherwise = Right ()
