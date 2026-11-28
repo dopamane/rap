@@ -21,7 +21,7 @@ main = getDataDir >>= \dataDir -> defaultMain $ testGroup "Data.Rap"
   , putEmptyTest, putVerseTest, putStanzaTest
   , tillICollapseTest, wavTest dataDir
   , putVerseTooLongTest, infiniteVerseTest, putStanzaTooLongTest, infStanzaTest
-  , badVerseID, badStanzaForm
+  , badVerseID, infVerseID, badStanzaForm, infStanzaID, infStanzaTy
   ]
 
 getEmptyTest :: TestTree
@@ -126,6 +126,10 @@ badVerseID = testCase "badVerseID" $ do
   (void . putRap) [Verse "foo" mempty] @?= Left "expecting 4 byte ID: \"foo\""
   (void . putRap) [Verse "foobar" mempty] @?= Left "expecting 4 byte ID: \"foob...\""
 
+infVerseID :: TestTree
+infVerseID = testCase "infVerseID" $
+  (void . putRap) [Verse (repeat 'a') mempty] @?= Left "expecting 4 byte ID: \"aaaa...\""
+
 badStanzaForm :: TestTree
 badStanzaForm = testCaseSteps "badStanzaForm" $ \step -> do
   step "lvl 1"
@@ -142,3 +146,15 @@ badStanzaForm = testCaseSteps "badStanzaForm" $ \step -> do
     @?= Left "expecting 4 byte type: \"cafe...\""
   (void . putRap) [Stanza "fooo" "baar" [Stanza "zooo" "caf" []]]
     @?= Left "expecting 4 byte type: \"caf\""
+
+infStanzaID :: TestTree
+infStanzaID = testCase "infStanzaID" $ do
+  (void . putRap) [Stanza (repeat 'a') "baar" []] @?= Left "expecting 4 byte ID: \"aaaa...\""
+  (void . putRap) [Stanza "aaaa" "baar" [Stanza (repeat 'b') "foob" []]]
+    @?= Left "expecting 4 byte ID: \"bbbb...\""
+
+infStanzaTy :: TestTree
+infStanzaTy = testCase "infStanzaTy" $ do
+  (void . putRap) [Stanza "fooo" (repeat 'a') []] @?= Left "expecting 4 byte type: \"aaaa...\""
+  (void . putRap) [Stanza "fooo" "baar" [Stanza "zooo" (repeat 'b') []]]
+    @?= Left "expecting 4 byte type: \"bbbb...\""
